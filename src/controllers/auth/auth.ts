@@ -75,7 +75,7 @@ export async function register(req: Request, res: Response): Promise<Response> {
 	const hashedPassword = await bcrypt.hash(password, 10);
 
 	// Save the user to the database and get the user id
-	const { error, message, result } = await insertOne("users", { email, username, password: hashedPassword });
+	const { error, message, result } = await insertOne("users", { email, username, password: hashedPassword, contacts: [] });
 	if (error) {
 		return res.status(500).json({ error: true, message });
 	}

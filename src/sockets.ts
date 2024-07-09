@@ -1,21 +1,38 @@
 import { Socket } from "socket.io";
 import { io } from "../index";
-import { findOne } from "./utils/dbComponent";
+import { findOne, find } from "./utils/dbComponent";
 import { secretKey } from "../index";
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 
-const users = new Map();
+const users: Map<string, Socket> = new Map();
 
-io.on("connection", async (socket: Socket) => {
+export async function ioConnection(socket: Socket) {
+	console.log("User is trying to connect");
 	const token: string = socket.handshake.auth.token;
-	const { error, result } = await authenticate(token);
-	if (error) {
-		socket.emit("error", result);
+	const authResult = await authenticate(token);
+
+	if ("error" in authResult) {
+		socket.emit("error", authResult.errorMessage);
 		return socket.disconnect(true);
 	}
-	const username: string = result;
+	const id: string = authResult.id;
+	const username: string = authResult.username;
+	const contacts = await getContacts(id);
+
+	if ("error" in contacts) {
+		socket.emit("error", contacts.errorMessage);
+		return socket.disconnect(true);
+	}
+	console.log("User connected");
 	users.set(username, socket);
+
+	for (const contact of contacts.result) {
+		const contactSocket = users.get(contact);
+		if (contactSocket) {
+			contactSocket.emit("user-connected", username);
+		}
+	}
 
 	socket.on("send-chat-message", (data: { messageType: string; message: string; receiverUsername: string; timestamp: string }) => {
 		const { messageType, message, receiverUsername, timestamp } = data;
@@ -45,33 +62,54 @@ io.on("connection", async (socket: Socket) => {
 
 	socket.on("disconnect", () => {
 		users.delete(username);
-		socket.broadcast.emit("user-disconnected", username);
+		for (const contact of contacts.result) {
+			const contactSocket = users.get(contact);
+			if (contactSocket) {
+				contactSocket.emit("user-disconnected", username);
+			}
+		}
 	});
-});
+}
 
-async function authenticate(token: string): Promise<{ error: boolean; result: string }> {
+async function authenticate(token: string): Promise<{ error: boolean; errorMessage: string } | { username: string; id: string }> {
 	if (!token || typeof token !== "string") {
-		return { error: true, result: "Invalid request" };
+		return { error: true, errorMessage: "Invalid request" };
 	}
 
 	let userId: string = "";
-
+	let authResult: boolean = false;
 	jwt.verify(token, secretKey, (err: any, decoded: any) => {
 		if (err) {
-			return { error: true, result: "Access denied" };
+			authResult = true;
 		} else {
 			userId = decoded.userId;
 		}
 	});
 
+	if (authResult) {
+		return { error: true, errorMessage: "Invalid token" };
+	}
+
 	const { error, message, result } = await findOne("users", { _id: ObjectId.createFromHexString(userId) });
 	if (error) {
-		return { error: true, result: message };
+		return { error: true, errorMessage: message };
 	}
 
 	if (!result || Object.keys(result).length === 0) {
-		return { error: true, result: "User not found" };
+		return { error: true, errorMessage: "User not found" };
 	}
 
-	return { error: false, result: result.username };
+	return { username: result.username, id: userId };
+}
+
+async function getContacts(userId: string): Promise<{ error: boolean; errorMessage: string } | { result: Array<string> }> {
+	const { error, message, result } = await findOne("users", { _id: ObjectId.createFromHexString(userId) });
+	if (error) {
+		return { error: true, errorMessage: message };
+	}
+
+	if (!result || Object.keys(result).length === 0) {
+		return { error: true, errorMessage: "User not found" };
+	}
+	return { result: result.contacts };
 }

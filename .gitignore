@@ -131,3 +131,8 @@ dist
 
 # Build files from typescript
 dist
+
+# Firebase service account key
+.serviceAccountKey.json
+
+testing

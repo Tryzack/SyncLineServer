@@ -26,12 +26,6 @@ async function getClient(): Promise<MongoClient | null> {
 	}
 }
 
-/**
- * Find one document in the collection
- * @param collection - The collection to search in
- * @param filter - The filter to apply
- * @returns { error: boolean; message: string; result: any | null } - The result of the operation
- */
 export async function findOne(collection: string, filter: Record<string, any>): Promise<{ error: boolean; message: string; result: any | null }> {
 	try {
 		const client = await getClient();
