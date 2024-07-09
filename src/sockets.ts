@@ -1,9 +1,7 @@
 import { Socket } from "socket.io";
-import { io } from "../index";
 import { findOne, find } from "./utils/dbComponent";
 import { secretKey } from "../index";
 import jwt from "jsonwebtoken";
-import { ObjectId } from "mongodb";
 
 const users: Map<string, Socket> = new Map();
 
@@ -90,7 +88,7 @@ async function authenticate(token: string): Promise<{ error: boolean; errorMessa
 		return { error: true, errorMessage: "Invalid token" };
 	}
 
-	const { error, message, result } = await findOne("users", { _id: ObjectId.createFromHexString(userId) });
+	const { error, message, result } = await findOne("users", { _id: userId });
 	if (error) {
 		return { error: true, errorMessage: message };
 	}
@@ -103,7 +101,7 @@ async function authenticate(token: string): Promise<{ error: boolean; errorMessa
 }
 
 async function getContacts(userId: string): Promise<{ error: boolean; errorMessage: string } | { result: Array<string> }> {
-	const { error, message, result } = await findOne("users", { _id: ObjectId.createFromHexString(userId) });
+	const { error, message, result } = await findOne("users", { _id: userId });
 	if (error) {
 		return { error: true, errorMessage: message };
 	}

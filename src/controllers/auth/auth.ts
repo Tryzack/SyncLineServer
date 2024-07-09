@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import { secretKey, expiresIn } from "../../../index";
 import bcrypt from "bcrypt";
 import { findOne, insertOne, deleteOne } from "../../utils/dbComponent";
-import { ObjectId } from "mongodb";
 
 export async function login(req: Request, res: Response): Promise<Response> {
 	let { email, password } = req.body;
@@ -74,6 +73,20 @@ export async function register(req: Request, res: Response): Promise<Response> {
 	// Hash the password
 	const hashedPassword = await bcrypt.hash(password, 10);
 
+	// Check if the someone with the email already exists or the username already exists
+	const { error: emailError, message: emailMessage, result: emailResult } = await findOne("users", { $or: [{ email }, { username }] });
+	if (emailError) {
+		return res.status(500).json({ error: true, message: emailMessage });
+	}
+
+	if (emailResult) {
+		if (emailResult.email === email) {
+			return res.status(409).json({ error: true, message: "Email already exists" });
+		} else if (emailResult.username === username) {
+			return res.status(409).json({ error: true, message: "Username already exists" });
+		}
+	}
+
 	// Save the user to the database and get the user id
 	const { error, message, result } = await insertOne("users", { email, username, password: hashedPassword, contacts: [] });
 	if (error) {
@@ -112,7 +125,7 @@ export async function unregister(req: Request, res: Response): Promise<Response>
 
 	password = password.trim();
 
-	const { error, message, result } = await findOne("users", { _id: ObjectId.createFromHexString(userId) });
+	const { error, message, result } = await findOne("users", { _id: userId });
 
 	if (error) {
 		return res.status(500).json({ error: true, message });
@@ -126,7 +139,7 @@ export async function unregister(req: Request, res: Response): Promise<Response>
 		return res.status(401).json({ error: true, message: "Invalid password" });
 	}
 
-	const { error: deleteError, message: deleteMessage } = await deleteOne("users", { _id: ObjectId.createFromHexString(userId) });
+	const { error: deleteError, message: deleteMessage } = await deleteOne("users", { _id: userId });
 	if (deleteError) {
 		return res.status(500).json({ error: true, message: deleteMessage });
 	}

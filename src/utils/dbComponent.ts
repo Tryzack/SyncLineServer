@@ -1,13 +1,12 @@
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import dotenv from "dotenv";
-import { strict } from "assert";
 
 dotenv.config();
 
 let client: MongoClient | null = null;
 let dbName: string = process.env.MONGO_DB || "NO DB FOUND";
 
-async function getClient(): Promise<MongoClient | null> {
+export async function getClient(): Promise<MongoClient | null> {
 	if (!client) {
 		client = new MongoClient(process.env.MONGO_URI || "NO URI FOUND", {
 			serverApi: {
@@ -26,11 +25,20 @@ async function getClient(): Promise<MongoClient | null> {
 	}
 }
 
+/**
+ * Function to find one document in a collection
+ * @param collection - The collection to search in
+ * @param filter - The filter to apply to the search, _id should be a string
+ * @returns { error: boolean, message: string, result: any | null }
+ */
 export async function findOne(collection: string, filter: Record<string, any>): Promise<{ error: boolean; message: string; result: any | null }> {
 	try {
 		const client = await getClient();
 		if (!client) {
 			return { error: true, message: "Error connecting to the database", result: null };
+		}
+		if (filter._id) {
+			filter._id = ObjectId.createFromHexString(filter._id);
 		}
 		const db = client.db(dbName);
 		const result = await db.collection(collection).findOne(filter);
@@ -42,6 +50,15 @@ export async function findOne(collection: string, filter: Record<string, any>): 
 	}
 }
 
+/**
+ * Function to find multiple documents in a collection
+ * @param collection - The collection to search in
+ * @param filter - The filter to apply to the search, _id should be a string
+ * @param sort - The sort to apply to the search
+ * @param limit - The limit of documents to return
+ * @param skip - The number of documents to skip
+ * @returns { error: boolean, message: string, result: any | null }
+ */
 export async function find(
 	collection: string,
 	filter: Record<string, any>,
@@ -53,6 +70,9 @@ export async function find(
 		const client = await getClient();
 		if (!client) {
 			return { error: true, message: "Error connecting to the database", result: null };
+		}
+		if (filter._id) {
+			filter._id = ObjectId.createFromHexString(filter._id);
 		}
 		const db = client.db(dbName);
 		const result = await db.collection(collection).find(filter).limit(limit).skip(skip).toArray();
@@ -66,6 +86,12 @@ export async function find(
 	}
 }
 
+/**
+ * Function to insert one document in a collection
+ * @param collection - The collection to insert in
+ * @param document - The document to insert into the collection
+ * @returns { error: boolean, message: string, result: any | null }
+ */
 export async function insertOne(collection: string, document: Record<string, any>): Promise<{ error: boolean; message: string; result: any | null }> {
 	try {
 		const client = await getClient();
@@ -81,11 +107,44 @@ export async function insertOne(collection: string, document: Record<string, any
 	}
 }
 
+/**
+ * Function to insert multiple documents in a collection
+ * @param collection - The collection to insert in
+ * @param documents - The documents to insert into the collection
+ * @returns { error: boolean, message: string, result: any | null }
+ */
+export async function insertMany(
+	collection: string,
+	documents: Record<string, any>[]
+): Promise<{ error: boolean; message: string; result: any | null }> {
+	try {
+		const client = await getClient();
+		if (!client) {
+			return { error: true, message: "Error connecting to the database", result: null };
+		}
+		const db = client.db(dbName);
+		const result = await db.collection(collection).insertMany(documents);
+		return { error: false, message: "Success", result };
+	} catch (error) {
+		console.error("Error inserting documents", error);
+		return { error: true, message: "Error inserting documents", result: null };
+	}
+}
+
+/**
+ * Function to delete one document in a collection
+ * @param collection - The collection to delete in
+ * @param filter - The filter to apply to the document to delete, _id should be a string
+ * @returns { error: boolean, message: string, result: any | null }
+ */
 export async function deleteOne(collection: string, filter: Record<string, any>): Promise<{ error: boolean; message: string; result: any | null }> {
 	try {
 		const client = await getClient();
 		if (!client) {
 			return { error: true, message: "Error connecting to the database", result: null };
+		}
+		if (filter._id) {
+			filter._id = ObjectId.createFromHexString(filter._id);
 		}
 		const db = client.db(dbName);
 		const result = await db.collection(collection).deleteOne(filter);
@@ -93,5 +152,34 @@ export async function deleteOne(collection: string, filter: Record<string, any>)
 	} catch (error) {
 		console.error("Error deleting document", error);
 		return { error: true, message: "Error deleting document", result: null };
+	}
+}
+
+/**
+ * Function to update one document in a collection
+ * @param collection - The collection to update in
+ * @param filter - The filter to apply to the document to update, _id should be a string
+ * @param update - The update to apply to the document
+ * @returns { error: boolean, message: string, result: any | null }
+ */
+export async function updateOne(
+	collection: string,
+	filter: Record<string, any>,
+	update: Record<string, any>
+): Promise<{ error: boolean; message: string; result: any | null }> {
+	try {
+		const client = await getClient();
+		if (!client) {
+			return { error: true, message: "Error connecting to the database", result: null };
+		}
+		if (filter._id) {
+			filter._id = ObjectId.createFromHexString(filter._id);
+		}
+		const db = client.db(dbName);
+		const result = await db.collection(collection).updateOne(filter, { $set: update });
+		return { error: false, message: "Success", result };
+	} catch (error) {
+		console.error("Error updating document", error);
+		return { error: true, message: "Error updating document", result: null };
 	}
 }
