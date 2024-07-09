@@ -134,5 +134,6 @@ dist
 
 # Firebase service account key
 .serviceAccountKey.json
+serviceAccountKey.json
 
 testing
