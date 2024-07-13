@@ -1,7 +1,7 @@
-import nodemailer from "nodemailer";
+import nodemailer from 'nodemailer';
 
-let senderEmail: string = "";
-let password: string = "";
+let senderEmail: string = '';
+let password: string = '';
 
 /**
  * Class to send emails
@@ -25,13 +25,23 @@ export class Mailer {
 	 * @param {string} email.type - email type (html or text)
 	 * @returns {Promise<string>} - Email response
 	 */
-	async sendEmail({ email, subject, body, type }: { email: string; subject: string; body: string; type: string }): Promise<string> {
+	async sendEmail({
+		email,
+		subject,
+		body,
+		type
+	}: {
+		email: string;
+		subject: string;
+		body: string;
+		type: string;
+	}): Promise<string> {
 		const transporter = nodemailer.createTransport({
-			service: "gmail",
+			service: 'gmail',
 			auth: {
 				user: this.senderEmail,
-				pass: this.password,
-			},
+				pass: this.password
+			}
 		});
 
 		let mailOptions:
@@ -47,26 +57,26 @@ export class Mailer {
 					subject: string;
 					text: string;
 			  };
-		if (type === "html")
+		if (type === 'html')
 			mailOptions = {
 				from: this.senderEmail,
 				to: email,
 				subject,
-				html: body,
+				html: body
 			};
 		else
 			mailOptions = {
 				from: this.senderEmail,
 				to: email,
 				subject,
-				text: body,
+				text: body
 			};
 
 		return new Promise((resolve, reject) => {
 			transporter.sendMail(mailOptions, (error, info) => {
 				if (error) {
 					console.error(error);
-					reject("Error sending email");
+					reject('Error sending email');
 				} else {
 					resolve(info.response);
 				}

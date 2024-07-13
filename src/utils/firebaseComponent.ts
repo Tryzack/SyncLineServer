@@ -1,11 +1,11 @@
-import admin, { ServiceAccount } from "firebase-admin";
-import { v4 as uuidv4 } from "uuid";
+import admin, { ServiceAccount } from 'firebase-admin';
+import { v4 as uuidv4 } from 'uuid';
 
 export default class FirebaseComponent {
 	constructor(serviceAccount: any, bucketUrl: string) {
 		admin.initializeApp({
 			credential: admin.credential.cert(serviceAccount),
-			storageBucket: bucketUrl, //storage bucket url
+			storageBucket: bucketUrl //storage bucket url
 		});
 	}
 
