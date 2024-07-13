@@ -15,6 +15,7 @@ const users: Map<string, Socket> = new Map();
  */
 interface message {
 	message: string;
+	messageType: string;
 	timestamp: string;
 	sender: string;
 	receiver: string;
@@ -22,6 +23,7 @@ interface message {
 }
 
 export async function ioConnection(socket: Socket) {
+	// Check if the user is authenticated
 	const token: string = socket.handshake.auth.token;
 	const authResult = await authenticate(token);
 
@@ -29,6 +31,8 @@ export async function ioConnection(socket: Socket) {
 		socket.emit('error', authResult.errorMessage);
 		return socket.disconnect(true);
 	}
+
+	// Check if the user has contacts
 	const id: string = authResult.id;
 	const username: string = authResult.username;
 	const contacts = await getContacts(id);
@@ -37,9 +41,12 @@ export async function ioConnection(socket: Socket) {
 		socket.emit('error', contacts.errorMessage);
 		return socket.disconnect(true);
 	}
+
+	// Add user to the users map if the user is authenticated
 	console.log('User connected');
 	users.set(username, socket);
 
+	// Tell contacts (if any) that the user is connected
 	for (const contact of contacts.result) {
 		const contactSocket = users.get(contact);
 		if (contactSocket) {
@@ -72,14 +79,13 @@ export async function ioConnection(socket: Socket) {
 		}
 	]);
 
+	console.log(messages); // not implemented yet
+
 	socket.on(
 		'chat-message',
 		async (data: { message: string; receiver: string; timestamp: string }) => {
 			const { message, receiver, timestamp } = data;
 			if (
-				!message ||
-				!receiver ||
-				!timestamp ||
 				typeof message !== 'string' ||
 				typeof receiver !== 'string' ||
 				typeof timestamp !== 'string'
@@ -109,6 +115,7 @@ export async function ioConnection(socket: Socket) {
 
 			const result = await insertMessage({
 				message,
+				messageType: 'text',
 				sender: username,
 				receiver,
 				timestamp,
@@ -126,9 +133,6 @@ export async function ioConnection(socket: Socket) {
 		async (data: { message: string; receiver: string; timestamp: string }) => {
 			const { message, receiver, timestamp } = data;
 			if (
-				!message ||
-				!receiver ||
-				!timestamp ||
 				typeof message !== 'string' ||
 				typeof receiver !== 'string' ||
 				typeof timestamp !== 'string'
@@ -161,6 +165,7 @@ export async function ioConnection(socket: Socket) {
 
 			const result = await insertMessage({
 				message,
+				messageType: 'text',
 				sender: username,
 				receiver,
 				timestamp,
@@ -217,6 +222,7 @@ async function authenticate(
 	return { username: result.username, id: userId };
 }
 
+// Get contacts of the user
 async function getContacts(
 	userId: string
 ): Promise<{ error: boolean; errorMessage: string } | { result: Array<string> }> {
@@ -231,13 +237,15 @@ async function getContacts(
 	return { result: result.contacts };
 }
 
+// Insert message into the database
 async function insertMessage(message: message) {
 	const { error, message: errorMessage } = await insertOne('messages', {
 		message: message.message,
+		messageType: message.messageType, // text, image, video, audio, file
 		timestamp: message.timestamp,
 		sender: message.sender,
-		receiver: message.receiver,
-		user: message.user
+		receiver: message.receiver, // username or group Id
+		user: message.user // true if it is a user message, false if it is a group message
 	});
 	if (error) {
 		return { error: true, errorMessage };
