@@ -3,26 +3,23 @@ import jwt from 'jsonwebtoken';
 import { secretKey, expiresIn } from '../../../index';
 import bcrypt from 'bcrypt';
 import { findOne, insertOne, deleteOne, updateOne } from '../../utils/dbComponent';
+import { validateStrings } from '../../utils/otherUtils';
 
 export async function login(req: Request, res: Response): Promise<Response> {
 	let { email, password } = req.body;
 
-	// Check if the email and password are provided
-	if (!email || !password) {
-		return res.status(400).json({ error: 'Email, password are required' });
-	}
+	// Check if the email and password are strings and are provided
+	if (!validateStrings([email, password]))
+		return res.status(400).json({ error: true, message: 'Invalid email and Password' });
 
-	// Check if the email and password are strings
-	if (typeof email !== 'string' || typeof password !== 'string') {
-		return res.status(400).json({ error: 'Invalid request types' });
-	}
-
-	// Trim the email and password
 	email = email.trim();
 	password = password.trim();
 
 	// Find the user in the database
-	const { error, message, result } = await findOne('users', { email });
+	const { error, message, result } = await findOne('users', {
+		email,
+		disabled: { isDisabled: false }
+	});
 	if (error) {
 		return res.status(500).json({ error: true, message });
 	}
@@ -37,6 +34,7 @@ export async function login(req: Request, res: Response): Promise<Response> {
 		return res.status(401).json({ error: true, message: 'Invalid password' });
 	}
 
+	// Check if the user is disabled
 	if (result.disabled.isDisabled) {
 		return res.status(403).json({ error: true, message: 'User is deleted' });
 	}
@@ -51,23 +49,14 @@ export async function login(req: Request, res: Response): Promise<Response> {
 
 export async function register(req: Request, res: Response): Promise<Response> {
 	let { email, password, username } = req.body;
-	// Check if the email, password and username are provided
-	if (!email || !password || !username) {
-		return res.status(400).json({
-			error: true,
-			message: 'Email, password and username are required'
-		});
-	}
 
 	// Check if the email, password and username are strings
-	if (typeof email !== 'string' || typeof password !== 'string' || typeof username !== 'string') {
+	if (!validateStrings([email, password, username]))
 		return res.status(400).json({ error: true, message: 'Invalid request types' });
-	}
 
-	// Trim the email, password and username
 	email = email.trim();
-	username = username.trim();
 	password = password.trim();
+	username = username.trim();
 
 	const emailRegex: RegExp = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
 
@@ -139,12 +128,8 @@ export async function unregister(req: Request, res: Response): Promise<Response>
 	}
 	let { password } = req.body;
 
-	if (!password) {
-		return res.status(400).json({ error: true, message: 'Email and password are required' });
-	}
-
-	if (typeof password !== 'string') {
-		return res.status(400).json({ error: true, message: 'Invalid request types' });
+	if (!validateStrings([password])) {
+		return res.status(400).json({ error: true, message: 'Invalid password type' });
 	}
 
 	password = password.trim();

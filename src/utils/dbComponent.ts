@@ -1,16 +1,10 @@
 import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
-
+import { Response as responseInterface } from './interfaces';
 dotenv.config();
 
 let client: MongoClient | null = null;
 let dbName: string = process.env.MONGO_DB || 'NO DB FOUND';
-
-interface responseInterface {
-	error: boolean;
-	message: string;
-	result: any | null;
-}
 
 export async function getClient(): Promise<MongoClient | null> {
 	if (!client) {

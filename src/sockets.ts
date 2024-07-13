@@ -2,25 +2,10 @@ import { Socket } from 'socket.io';
 import { findOne, insertOne, aggregateFind } from './utils/dbComponent';
 import { secretKey } from '../index';
 import jwt from 'jsonwebtoken';
+import { Message } from './utils/interfaces';
+import { validateStrings } from './utils/otherUtils';
 
 const users: Map<string, Socket> = new Map();
-
-/**
- *  Message interface
- * @param message {string} - message content
- * @param timestamp {string} - message timestamp
- * @param sender {string} - user who sent the message
- * @param receiver {string} - username or group Id of the receiver
- * @param user {boolean} - true if it is a user message, false if it is a group message
- */
-interface message {
-	message: string;
-	messageType: string;
-	timestamp: string;
-	sender: string;
-	receiver: string;
-	user: boolean;
-}
 
 export async function ioConnection(socket: Socket) {
 	// Check if the user is authenticated
@@ -84,15 +69,10 @@ export async function ioConnection(socket: Socket) {
 	socket.on(
 		'chat-message',
 		async (data: { message: string; receiver: string; timestamp: string }) => {
-			const { message, receiver, timestamp } = data;
-			if (
-				typeof message !== 'string' ||
-				typeof receiver !== 'string' ||
-				typeof timestamp !== 'string'
-			) {
-				socket.emit('error', 'Invalid request');
-				return;
-			}
+			let { message, receiver, timestamp } = data;
+
+			if (!validateStrings([message, receiver, timestamp]))
+				return socket.emit('error', 'Invalid request');
 
 			const userReceiver = await findOne('users', { username: receiver });
 			if (userReceiver.error) {
@@ -132,14 +112,8 @@ export async function ioConnection(socket: Socket) {
 		'group-message',
 		async (data: { message: string; receiver: string; timestamp: string }) => {
 			const { message, receiver, timestamp } = data;
-			if (
-				typeof message !== 'string' ||
-				typeof receiver !== 'string' ||
-				typeof timestamp !== 'string'
-			) {
-				socket.emit('error', 'Invalid request');
-				return;
-			}
+			if (!validateStrings([message, receiver, timestamp]))
+				return socket.emit('error', 'Invalid request');
 
 			const group = await findOne('groups', { _id: receiver });
 			if (group.error) {
@@ -189,6 +163,7 @@ export async function ioConnection(socket: Socket) {
 	});
 }
 
+// Authenticate the user
 async function authenticate(
 	token: string
 ): Promise<{ error: boolean; errorMessage: string } | { username: string; id: string }> {
@@ -238,7 +213,7 @@ async function getContacts(
 }
 
 // Insert message into the database
-async function insertMessage(message: message) {
+async function insertMessage(message: Message) {
 	const { error, message: errorMessage } = await insertOne('messages', {
 		message: message.message,
 		messageType: message.messageType, // text, image, video, audio, file

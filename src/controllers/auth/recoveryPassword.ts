@@ -3,18 +3,18 @@ import { mailer } from '../../../index';
 import * as resetKeys from '../../utils/resetKeys';
 import bcrypt from 'bcrypt';
 import { Request, Response } from 'express';
-
+import { validateStrings } from '../../utils/otherUtils';
 /**
  * Send recovery code to user email
  * @param {string} req.body.email - Required
- * @returns {Object} -Response
+ * @returns {Response} - Response
  */
 export async function sendRecoveryCode(req: Request, res: Response): Promise<Response> {
 	const email = req.body.email;
+	if (!validateStrings([email]))
+		return res.status(400).json({ message: 'Invalid request types' });
+
 	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-	if (!email) return res.status(400).json({ message: 'Email is required' });
-	if (typeof email !== 'string')
-		return res.status(400).json({ message: 'Email must be a string' });
 	if (!emailRegex.test(email)) return res.status(400).json({ message: 'Invalid email' });
 
 	const keys = resetKeys.getResetKeys();
@@ -86,16 +86,12 @@ export async function sendRecoveryCode(req: Request, res: Response): Promise<Res
  * Check if recovery code is valid
  * @param {string} req.body.email - Required
  * @param {string} req.body.code - Required
- * @returns {Object} -Rresponse
+ * @returns {Response} -Response
  */
 export async function recoveryCode(req: Request, res: Response): Promise<Response> {
 	let { email, code } = req.body;
-	if (!email || !code) {
-		return res.status(400).json({ message: 'Email and code are required' });
-	}
-	if (typeof email !== 'string' || typeof code !== 'string') {
-		return res.status(400).json({ message: 'Email and code must be strings' });
-	}
+	if (!validateStrings([email, code]))
+		return res.status(400).json({ message: 'Invalid request types' });
 	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 	email = email.trim();
 	code = code.trim();
@@ -124,22 +120,20 @@ export async function recoveryCode(req: Request, res: Response): Promise<Respons
  * @param {string} req.body.email - Required
  * @param {string} req.body.code - Required
  * @param {string} req.body.password - Required
+ * @returns {Response} - Response
  */
 export async function recoveryPassword(req: Request, res: Response): Promise<Response> {
 	let { email, code, password } = req.body;
-	if (!email || !code || !password) {
-		return res.status(400).json({ message: 'Email, code and password are required' });
-	}
-	if (typeof email !== 'string' || typeof code !== 'string' || typeof password !== 'string') {
-		return res.status(400).json({ message: 'Email, code and password must be strings' });
-	}
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	if (!validateStrings([email, code, password]))
+		return res.status(400).json({ message: 'Invalid request types' });
+
 	email = email.trim();
 	code = code.trim();
 	password = password.trim();
-	if (!emailRegex.test(email)) {
-		return res.status(400).json({ message: 'Invalid email' });
-	}
+
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+	if (!emailRegex.test(email)) return res.status(400).json({ message: 'Invalid email' });
 
 	const user = await findOne('users', { email });
 	if (user.error) return res.status(500).json({ message: 'Internal server error' });

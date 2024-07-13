@@ -1,8 +1,5 @@
 import nodemailer from 'nodemailer';
 
-let senderEmail: string = '';
-let password: string = '';
-
 /**
  * Class to send emails
  * @class Mailer
