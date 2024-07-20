@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io';
-import { findOne, insertOne, aggregateFind } from './utils/dbComponent';
+import { findOne, insertOne, aggregateFind, find } from './utils/dbComponent';
 import { secretKey } from '../index';
 import jwt from 'jsonwebtoken';
 import { Message } from './utils/interfaces';
@@ -21,9 +21,27 @@ export async function ioConnection(socket: Socket) {
 	const id: string = authResult.id;
 	const username: string = authResult.username;
 	const contacts = await getContacts(id);
+	const groups = await getGroups(id);
 
 	if ('error' in contacts) {
 		socket.emit('error', contacts.errorMessage);
+		console.log('User disconnected', contacts.errorMessage);
+		return socket.disconnect(true);
+	}
+
+	if ('error' in groups) {
+		socket.emit('error', groups.errorMessage);
+		console.log('User disconnected', groups.errorMessage);
+		return socket.disconnect(true);
+	}
+
+	const userData = await findOne('users', {
+		_id: id,
+		disabled: { isDisabled: false, timestamp: null }
+	});
+	if (userData.error) {
+		socket.emit('error', userData.message);
+		console.log('User disconnected', userData.message);
 		return socket.disconnect(true);
 	}
 
@@ -42,12 +60,13 @@ export async function ioConnection(socket: Socket) {
 	const messages = await aggregateFind('messages', [
 		{
 			$match: {
-				sender: username
+				receiver: username,
+				user: true
 			}
 		},
 		{
 			$sort: {
-				timestamp: 1
+				timestamp: -1
 			}
 		},
 		{
@@ -64,64 +83,52 @@ export async function ioConnection(socket: Socket) {
 		}
 	]);
 
-	console.log(messages); // not implemented yet
+	socket.emit('messages', messages.result);
 
-	socket.on(
-		'chat-message',
-		async (data: { message: string; receiver: string; timestamp: string }) => {
-			let { message, receiver, timestamp } = data;
+	socket.on('chat-message', async (data: { message: string; receiver: string }) => {
+		let { message, receiver } = data;
+		const timestamp = new Date().toISOString();
 
-			if (!validateStrings([message, receiver, timestamp]))
-				return socket.emit('error', 'Invalid request');
+		if (!validateStrings([message, receiver, timestamp]))
+			return socket.emit('error', 'Invalid request');
 
-			const userReceiver = await findOne('users', { username: receiver });
-			if (userReceiver.error) {
-				socket.emit('error', { message: userReceiver.message });
-				return;
-			}
-
-			const socketReceiver = users.get(receiver.trim());
-			if (socketReceiver)
-				socketReceiver.emit('chat-message', {
-					message,
-					sender: username,
-					timestamp,
-					senderData: {
-						username,
-						picture: userReceiver.result.picture,
-						description: userReceiver.result.description
-					}
-				});
-
-			const result = await insertMessage({
+		const socketReceiver = users.get(receiver.trim());
+		if (socketReceiver)
+			socketReceiver.emit('chat-message', {
 				message,
-				messageType: 'text',
 				sender: username,
-				receiver,
 				timestamp,
-				user: true
+				senderData: {
+					username,
+					picture: userData.result.picture,
+					description: userData.result.description
+				}
 			});
-			if (result.error) {
-				socket.emit('error', result.errorMessage);
-			}
-			socket.emit('message-sent', { receiver, message, timestamp });
-		}
-	);
 
-	socket.on(
-		'group-message',
-		async (data: { message: string; receiver: string; timestamp: string }) => {
-			const { message, receiver, timestamp } = data;
+		const result = await insertMessage({
+			message,
+			messageType: 'text',
+			sender: username,
+			receiver,
+			timestamp,
+			user: true
+		});
+		if (result.error) {
+			socket.emit('error', result.errorMessage);
+		}
+		socket.emit('message-sent', { receiver, message, timestamp });
+	});
+
+	socket.on('group-message', async (data: { message: string; receiver: string }) => {
+		try {
+			const { message, receiver } = data;
+			const timestamp = new Date().toISOString();
 			if (!validateStrings([message, receiver, timestamp]))
 				return socket.emit('error', 'Invalid request');
 
-			const group = await findOne('groups', { _id: receiver });
-			if (group.error) {
-				socket.emit('error', group.message);
-				return;
-			}
-
-			const members = group.result.members;
+			const group = groups.result.find((group: any) => group._id === receiver);
+			if (!group) return socket.emit('error', 'Group not found');
+			const members: Array<string> = group.result.members;
 			for (const member of members) {
 				const socketMember = users.get(member);
 				if (socketMember)
@@ -131,26 +138,29 @@ export async function ioConnection(socket: Socket) {
 						timestamp,
 						senderData: {
 							username,
-							pcture: group.result.picture,
-							description: group.result.description
+							pcture: userData.result.picture,
+							description: userData.result.description
 						}
 					});
+				const result = await insertMessage({
+					message,
+					messageType: 'text',
+					sender: username,
+					receiver: member,
+					timestamp,
+					user: false
+				});
+				if (result.error) {
+					socket.emit('error', result.errorMessage);
+				}
 			}
 
-			const result = await insertMessage({
-				message,
-				messageType: 'text',
-				sender: username,
-				receiver,
-				timestamp,
-				user: false
-			});
-			if (result.error) {
-				socket.emit('error', result.errorMessage);
-			}
 			socket.emit('message-sent', { receiver, message, timestamp });
+		} catch (error) {
+			console.error('Error sending group message', error);
+			socket.emit('error', 'Error sending group message');
 		}
-	);
+	});
 
 	socket.on('disconnect', () => {
 		users.delete(username);
@@ -210,6 +220,21 @@ async function getContacts(
 		return { error: true, errorMessage: 'User not found' };
 	}
 	return { result: result.contacts };
+}
+
+// Get groups of the user
+async function getGroups(
+	userId: string
+): Promise<{ error: boolean; errorMessage: string } | { result: Array<any> }> {
+	const { error, message, result } = await find('users', { _id: userId });
+	if (error) {
+		return { error: true, errorMessage: message };
+	}
+
+	if (!result || Object.keys(result).length === 0) {
+		return { error: true, errorMessage: 'User not found' };
+	}
+	return { result: result.groups };
 }
 
 // Insert message into the database

@@ -18,7 +18,7 @@ export async function login(req: Request, res: Response): Promise<Response> {
 	// Find the user in the database
 	const { error, message, result } = await findOne('users', {
 		email,
-		disabled: { isDisabled: false }
+		disabled: { isDisabled: false, timestamp: null }
 	});
 	if (error) {
 		return res.status(500).json({ error: true, message });

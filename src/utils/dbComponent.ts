@@ -122,7 +122,7 @@ export async function aggregateFind(
 			};
 		}
 		const db = client.db(dbName);
-		const result = await db.collection(collection).aggregate([aggregateParamas]).toArray();
+		const result = await db.collection(collection).aggregate(aggregateParamas).toArray();
 		return { error: false, message: 'Success', result };
 	} catch (error) {
 		console.error('Error finding documents', error);
