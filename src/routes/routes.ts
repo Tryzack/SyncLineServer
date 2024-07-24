@@ -16,6 +16,7 @@ import verifyToken from '../controllers/auth/verifyToken';
 import { uploadFile } from '../controllers/uploadFile';
 import { getFriends, addFriend, deleteFriend } from '../controllers/friends';
 import { getChats, getChatMessages } from '../controllers/chats';
+import { getStatus, createStatus } from '../controllers/status';
 
 const router: Router = Router();
 
@@ -43,5 +44,8 @@ router.delete('/friends/delete', verifyToken, deleteFriend);
 
 router.get('/chats', verifyToken, getChats);
 router.get('/chats/messages', verifyToken, getChatMessages);
+
+router.get('/status', verifyToken, getStatus);
+router.post('/status', verifyToken, createStatus);
 
 export default router;

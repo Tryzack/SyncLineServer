@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { aggregateFind, findOne, complexUpdateOne } from '../utils/dbComponent';
 import { validateStrings } from '../utils/otherUtils';
+import { v4 } from 'uuid';
+import path from 'path';
 
 export async function createStatus(req: Request, res: Response) {
 	const { userId } = req.body.user;
@@ -14,9 +16,9 @@ export async function createStatus(req: Request, res: Response) {
 	}
 
 	const status = {
+		id: v4(),
 		content,
-		description,
-		timestamp: new Date()
+		description
 	};
 
 	const result = await complexUpdateOne(
@@ -37,6 +39,27 @@ export async function createStatus(req: Request, res: Response) {
 			message: result.message
 		});
 	}
+
+	// create a timeout to delete the status after a certain time
+	const timer: number = 1000 * 60 * 60 * 24; // 24 hours
+	const devTimer: number = 1000 * 60 * 1; // 1 minute
+	setTimeout(async () => {
+		const deleteResult = await complexUpdateOne(
+			'users',
+			{
+				_id: userId
+			},
+			{
+				$pull: {
+					status
+				}
+			}
+		);
+
+		if (deleteResult.error) {
+			console.error(deleteResult.message);
+		}
+	}, devTimer);
 
 	return res.status(200).json({
 		error: false,
@@ -82,7 +105,10 @@ export async function getStatus(req: Request, res: Response) {
 			}
 		},
 		{
-			$unwind: '$status'
+			$unwind: {
+				path: '$status',
+				preserveNullAndEmptyArrays: true
+			}
 		},
 		{
 			$replaceRoot: {
@@ -107,4 +133,16 @@ export async function getStatus(req: Request, res: Response) {
 			}
 		}
 	]);
+
+	if (statuses.error) {
+		return res.status(500).json({
+			error: true,
+			message: statuses.message
+		});
+	}
+
+	return res.status(200).json({
+		error: false,
+		statuses: statuses.result
+	});
 }
