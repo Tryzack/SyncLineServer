@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { findOne, aggregateFind, find, insertOne } from '../utils/dbComponent';
 import { ObjectId } from 'mongodb';
+import { url } from 'inspector';
 
 export async function getChats(req: Request, res: Response) {
 	const memberId: string = req.body.user.userId;
-	console.log(memberId);
 
 	try {
 		const chats = await aggregateFind('chats', [
@@ -23,11 +23,14 @@ export async function getChats(req: Request, res: Response) {
 				$project: {
 					members: 1,
 					user: 1,
+					name: 1,
+					description: 1,
+					url: 1,
 					message: { $slice: ['$message', 1] } // Limit to the first 1 messages
 				}
 			},
 			{
-				$unwind: '$message'
+				$unwind: { path: '$messages', preserveNullAndEmptyArrays: true }
 			},
 			{
 				$lookup: {
@@ -49,6 +52,9 @@ export async function getChats(req: Request, res: Response) {
 				$project: {
 					_id: 1,
 					user: 1,
+					name: 1,
+					description: 1,
+					url: 1,
 					members: {
 						$map: {
 							input: '$membersInfo',
@@ -94,7 +100,7 @@ export async function getChatMessages(req: Request, res: Response) {
 				}
 			},
 			{
-				$unwind: '$messages'
+				$unwind: { path: '$messages', preserveNullAndEmptyArrays: true }
 			},
 			{
 				$lookup: {
@@ -113,16 +119,32 @@ export async function getChatMessages(req: Request, res: Response) {
 				}
 			},
 			{
+				$lookup: {
+					from: 'users',
+					localField: 'admins',
+					foreignField: '_id',
+					as: 'adminsInfo'
+				}
+			},
+			{
 				$project: {
 					_id: 1,
 					user: 1,
+					name: 1,
+					description: 1,
+					admins: {
+						$map: {
+							input: '$adminsInfo',
+							as: 'admin',
+							in: '$$admin.username'
+						}
+					},
 					members: {
 						$map: {
 							input: '$membersInfo',
 							as: 'member',
 							in: {
-								username: '$$member.username',
-								url: '$$member.url'
+								username: '$$member.username'
 							}
 						}
 					},
@@ -139,13 +161,19 @@ export async function getChatMessages(req: Request, res: Response) {
 					_id: '$_id',
 					user: { $first: '$user' },
 					members: { $first: '$members' },
-					messages: { $push: '$messageContent' }
+					admins: { $first: '$admins' },
+					messages: { $push: '$messageContent' },
+					name: { $first: '$name' },
+					description: { $first: '$description' }
 				}
 			},
 			{
 				$project: {
 					_id: 1,
 					user: 1,
+					name: 1,
+					description: 1,
+					admins: 1,
 					members: 1,
 					messages: { $slice: ['$messages', skip, limit] }
 				}

@@ -5,7 +5,7 @@ import {
 	recoveryPassword,
 	sendRecoveryCode
 } from '../controllers/auth/recoveryPassword';
-import { getGroups, getGroup, createGroup, deleteGroup, updateGroup } from '../controllers/group';
+import { createGroup, deleteGroup, updateGroup } from '../controllers/group';
 import verifyToken from '../controllers/auth/verifyToken';
 import { uploadFile } from '../controllers/uploadFile';
 import { getFriends, addFriend, deleteFriend } from '../controllers/friends';
@@ -23,8 +23,6 @@ router.post('/recovery/sendCode', sendRecoveryCode);
 router.post('/recovery/verifyCode', recoveryCode);
 router.put('/recovery/changePassword', recoveryPassword);
 
-router.get('/get/group', verifyToken, getGroups);
-router.get('/get/group/:groupId', verifyToken, getGroup);
 router.post('/insert/group', verifyToken, createGroup);
 router.delete('/delete/group/:groupId', verifyToken, deleteGroup);
 router.put('/update/group/:groupId', verifyToken, updateGroup);
