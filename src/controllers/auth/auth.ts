@@ -48,10 +48,10 @@ export async function login(req: Request, res: Response): Promise<Response> {
 }
 
 export async function register(req: Request, res: Response): Promise<Response> {
-	let { email, password, username } = req.body;
+	let { email, password, username, url } = req.body;
 
 	// Check if the email, password and username are strings
-	if (!validateStrings([email, password, username]))
+	if (!validateStrings([email, password, username, url]))
 		return res.status(400).json({ error: true, message: 'Invalid request types' });
 
 	email = email.trim();
@@ -97,7 +97,8 @@ export async function register(req: Request, res: Response): Promise<Response> {
 		email,
 		username,
 		password: hashedPassword,
-		contacts: [],
+		url: url || null,
+		friends: [],
 		disabled: { isDisabled: false, timestamp: null }
 	});
 	if (error) {

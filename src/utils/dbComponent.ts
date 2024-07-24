@@ -249,3 +249,36 @@ export async function updateOne(
 		return { error: true, message: 'Error updating document', result: null };
 	}
 }
+
+/**
+ * Function to complex update one document in a collection
+ * @param collection - The collection to update in
+ * @param filter - The filter to apply to the document to update, _id should be a string
+ * @param update - The update to apply to the document
+ * @returns { error: boolean, message: string, result: any | null }
+ */
+export async function complexUpdateOne(
+	collection: string,
+	filter: Record<string, any>,
+	update: Record<string, any>
+): Promise<responseInterface> {
+	try {
+		const client = await getClient();
+		if (!client) {
+			return {
+				error: true,
+				message: 'Error connecting to the database',
+				result: null
+			};
+		}
+		if (filter._id) {
+			filter._id = ObjectId.createFromHexString(filter._id);
+		}
+		const db = client.db(dbName);
+		const result = await db.collection(collection).updateOne(filter, update);
+		return { error: false, message: 'Success', result };
+	} catch (error) {
+		console.error('Error updating document', error);
+		return { error: true, message: 'Error updating document', result: null };
+	}
+}

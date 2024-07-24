@@ -46,7 +46,13 @@ const app: Express = express();
 
 // Middlewares initialization
 app.use(cookieParser())
-	.use(cors())
+	.use(
+		cors({
+			origin: function (origin, callback) {
+				return callback(null, true);
+			}
+		})
+	)
 	.use(express.json())
 	.use(express.urlencoded({ extended: true }))
 	.use(router);
@@ -55,8 +61,7 @@ app.use(cookieParser())
 const server = http.createServer(app);
 const io = new Server(server, {
 	cors: {
-		origin: 'http://localhost:3000',
-		credentials: true
+		origin: '*'
 	}
 });
 

@@ -7,6 +7,10 @@ import {
 } from '../controllers/auth/recoveryPassword';
 import { getGroups, getGroup, createGroup, deleteGroup, updateGroup } from '../controllers/group';
 import verifyToken from '../controllers/auth/verifyToken';
+import { uploadFile } from '../controllers/uploadFile';
+import { getFriends, addFriend, deleteFriend } from '../controllers/friends';
+import { getChats, getChatMessages } from '../controllers/chats';
+
 const router: Router = Router();
 
 router.get('/auth/checkSession', verifyToken, checkSession);
@@ -24,5 +28,14 @@ router.get('/get/group/:groupId', verifyToken, getGroup);
 router.post('/insert/group', verifyToken, createGroup);
 router.delete('/delete/group/:groupId', verifyToken, deleteGroup);
 router.put('/update/group/:groupId', verifyToken, updateGroup);
+
+router.post('/upload', uploadFile);
+
+router.get('/friends', verifyToken, getFriends);
+router.post('/friends/add', verifyToken, addFriend);
+router.delete('/friends/delete', verifyToken, deleteFriend);
+
+router.get('/chats', verifyToken, getChats);
+router.get('/chats/messages', verifyToken, getChatMessages);
 
 export default router;
