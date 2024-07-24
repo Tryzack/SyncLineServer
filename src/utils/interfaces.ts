@@ -8,11 +8,9 @@
  */
 export interface Message {
 	message: string;
-	messageType: string;
+	type: string;
 	timestamp: string;
 	sender: string;
-	receiver: string;
-	user: boolean;
 }
 
 /**

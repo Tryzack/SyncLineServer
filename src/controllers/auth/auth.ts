@@ -51,7 +51,7 @@ export async function register(req: Request, res: Response): Promise<Response> {
 	let { email, password, username, url } = req.body;
 
 	// Check if the email, password and username are strings
-	if (!validateStrings([email, password, username, url]))
+	if (!validateStrings([email, password, username]))
 		return res.status(400).json({ error: true, message: 'Invalid request types' });
 
 	email = email.trim();
@@ -97,9 +97,10 @@ export async function register(req: Request, res: Response): Promise<Response> {
 		email,
 		username,
 		password: hashedPassword,
-		url: url || null,
+		url: [typeof url === 'string' ? url : null],
 		friends: [],
-		disabled: { isDisabled: false, timestamp: null }
+		disabled: { isDisabled: false, timestamp: null },
+		status: []
 	});
 	if (error) {
 		return res.status(500).json({ error: true, message });
@@ -113,8 +114,38 @@ export async function register(req: Request, res: Response): Promise<Response> {
 	return res.status(200).json({ error: false, message: 'Registered successfully' });
 }
 
+export async function updateUser(req: Request, res: Response): Promise<Response> {
+	let { email, password, username, url } = req.body;
+	const userId = req.body.user.userId;
+
+	if (!validateStrings([email, password, username])) {
+		return res.status(400).json({ error: true, message: 'Invalid request types' });
+	}
+
+	email = email.trim();
+	username = username.trim();
+
+	const emailRegex: RegExp = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+
+	if (!emailRegex.test(email)) {
+		return res.status(400).json({ error: true, message: 'Invalid email' });
+	}
+
+	const { error, message } = await updateOne(
+		'users',
+		{ _id: userId },
+		{ $set: { email, username, url } }
+	);
+	if (error) {
+		return res.status(500).json({ error: true, message });
+	}
+
+	return res.status(200).json({ error: false, message: 'User updated successfully' });
+}
+
 export function checkSession(req: Request, res: Response): Response {
-	return res.status(200).json({ message: 'Token is valid' });
+	const token = req.cookies.token || req.headers.authorization;
+	return res.status(200).json({ message: 'Token is valid', token });
 }
 
 export function logout(req: Request, res: Response): Response {

@@ -45,7 +45,7 @@ export async function getChatMessages(limit: number = 20, chat: string) {
 
 export async function insertChatMessage(
 	message: Message,
-	chat: string | null
+	chat: string
 ): Promise<{ error: boolean; errorMessage?: string }> {
 	// Insert message into the databas
 	const {
@@ -54,33 +54,18 @@ export async function insertChatMessage(
 		result
 	} = await insertOne('messages', {
 		message: message.message,
-		messageType: message.messageType, // text, image, video, audio, file
+		type: message.type, // text, image, video, audio, file
 		timestamp: message.timestamp,
-		sender: message.sender,
-		user: message.user // true if it is a user message, false if it is a group message
+		sender: message.sender
 	});
 	if (error) {
 		return { error: true, errorMessage };
 	}
-	if (!chat) {
-		const {
-			error: newChatError,
-			result: newChatResult,
-			message: newChatMessage
-		} = await insertOne('chats', {
-			members: [message.sender, message.receiver],
-			user: true
-		});
-		if (newChatError) {
-			return { error: true, errorMessage: newChatMessage };
-		}
-		chat = newChatResult.insertedId;
-	}
-	if (chat)
-		insertOne('chat-messages', {
-			chatId: ObjectId.createFromHexString(chat),
-			messageId: ObjectId.createFromHexString(result.insertedId)
-		});
+
+	insertOne('chat-messages', {
+		chatId: ObjectId.createFromHexString(chat),
+		messageId: result.insertedId
+	});
 
 	return { error: false };
 }

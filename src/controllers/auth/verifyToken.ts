@@ -3,9 +3,9 @@ import jwt from 'jsonwebtoken';
 import { secretKey } from '../../../index';
 
 export default function verifyToken(req: Request, res: Response, next: NextFunction) {
-	const token = req.cookies.token;
+	let token = req.cookies.token || req.headers.authorization;
 	if (!token) {
-		return res.status(401).json({ error: true, message: 'Access denied' });
+		return res.status(403).json({ error: true, message: 'Access denied' });
 	}
 
 	// Verify the token

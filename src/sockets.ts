@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io';
-import { findOne, insertOne, aggregateFind, find } from './utils/dbComponent';
+import { findOne, aggregateFind, find } from './utils/dbComponent';
 import { secretKey } from '../index';
 import jwt from 'jsonwebtoken';
 import { insertChatMessage } from './utils/otherUtils';
@@ -60,44 +60,73 @@ export async function ioConnection(socket: Socket) {
 		}
 	}
 
-	socket.on(
-		'chat-message',
-		async (data: { message: string; receiver: string; chat: string | null; type: string }) => {
-			let { message, receiver, chat, type } = data;
-			const timestamp = new Date().toISOString();
+	socket.on('chat-message', async (data: { message: string; chat: string; type: string }) => {
+		let { message, chat, type } = data;
+		const timestamp = new Date().toISOString();
 
-			if (!validateStrings([message, receiver, type]))
-				return socket.emit('error', 'Invalid request');
-			message = message.trim();
-			receiver = receiver.trim();
-			type = type.trim();
+		if (!validateStrings([message, chat, type])) return socket.emit('error', 'Invalid request');
+		message = message.trim();
+		type = type.trim();
 
-			const socketReceiver = users.get(receiver);
-			if (socketReceiver)
-				socketReceiver.emit('chat-message', {
-					message,
-					messageType: type,
-					sender: username,
-					timestamp
-				});
-
-			const result = await insertChatMessage(
-				{
-					message,
-					messageType: type,
-					sender: username,
-					timestamp,
-					receiver: receiver,
-					user: true
-				},
-				chat
-			);
-			if (result.error) {
-				socket.emit('error', result.errorMessage);
+		const chatResult = await aggregateFind('chats', [
+			{
+				$match: {
+					_id: ObjectId.createFromHexString(chat)
+				}
+			},
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'members',
+					foreignField: '_id',
+					as: 'member'
+				}
+			},
+			{
+				$project: {
+					_id: 0,
+					memberResult: {
+						$map: {
+							input: '$member',
+							as: 'members',
+							in: '$$members.username'
+						}
+					}
+				}
 			}
-			socket.emit('message-sent', { receiver, message, timestamp });
+		]);
+		if (chatResult.error) return socket.emit('error', chatResult.message);
+		if (chatResult.result.length === 0) return socket.emit('error', 'Receiver not found');
+		// chatResult.result is an array of objects with each string username in the memberResult array
+		// there is 2 receivers in the chat so we need to send the message to only the one that is not the sender
+		const receiver = chatResult.result[0].memberResult.find(
+			(member: string) => member !== username
+		);
+		if (!receiver) return socket.emit('error', 'Receiver not found');
+		const socketReceiver = users.get(receiver);
+		if (socketReceiver)
+			socketReceiver.emit('chat-message', {
+				message,
+				messageType: type,
+				sender: username,
+				timestamp
+			});
+		console.log('Message sent');
+
+		const result = await insertChatMessage(
+			{
+				message,
+				type: type,
+				sender: username,
+				timestamp
+			},
+			chat
+		);
+		if (result.error) {
+			socket.emit('error', result.errorMessage);
 		}
-	);
+		socket.emit('message-sent', { receiver, message, timestamp });
+	});
 
 	socket.on('group-message', async (data: { message: string; chat: string; type: string }) => {
 		// need changes
@@ -158,11 +187,9 @@ export async function ioConnection(socket: Socket) {
 			const result = await insertChatMessage(
 				{
 					message,
-					messageType: type,
+					type: type,
 					sender: username,
-					receiver: group.result._id,
-					timestamp,
-					user: false
+					timestamp
 				},
 				chat
 			);
@@ -174,6 +201,59 @@ export async function ioConnection(socket: Socket) {
 		} catch (error) {
 			console.error('Error sending group message', error);
 			socket.emit('error', 'Error sending group message');
+		}
+	});
+
+	socket.on('update', async (data: { chat: string; user: boolean }) => {
+		const { chat, user } = data;
+
+		if (user) {
+			// need changes
+			const usersResponse = await aggregateFind('chats', []);
+			if (usersResponse.error) return socket.emit('error', usersResponse.message);
+			if (usersResponse.result.length === 0) return socket.emit('error', 'User not found');
+			const members: Array<{ username: string }> = usersResponse.result.membersInfo;
+			members.forEach((member) => {
+				const socketMember = users.get(member.username);
+				if (socketMember) socketMember.emit('update', { chat, user });
+			});
+		} else {
+			const groupResponse = await aggregateFind('chats', [
+				{
+					$match: {
+						_id: ObjectId.createFromHexString(chat),
+						user: false
+					}
+				},
+				{
+					$lookup: {
+						from: 'users',
+						localField: 'members',
+						foreignField: '_id',
+						as: 'membersInfo'
+					}
+				},
+				{
+					$project: {
+						membersInfo: {
+							$map: {
+								input: '$membersInfo',
+								as: 'member',
+								in: {
+									username: '$$member.username'
+								}
+							}
+						}
+					}
+				}
+			]);
+			if (groupResponse.error) return socket.emit('error', groupResponse.message);
+			if (!groupResponse.result) return socket.emit('error', 'Group not found');
+			const members: Array<{ username: string }> = groupResponse.result.membersInfo;
+			members.forEach((member) => {
+				const socketMember = users.get(member.username);
+				if (socketMember) socketMember.emit('update', { chat });
+			});
 		}
 	});
 

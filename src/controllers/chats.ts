@@ -187,3 +187,30 @@ export async function getChatMessages(req: Request, res: Response) {
 		return res.status(500).json({ error: true, errorMessage: error });
 	}
 }
+
+export async function createChat(req: Request, res: Response) {
+	const userId: string = req.body.user.userId;
+	const member: string = req.body.member; // username
+
+	try {
+		const { error, message, result } = await findOne('users', { username: member });
+		if (error) return res.status(500).json({ error: true, errorMessage: message });
+
+		if (!result || Object.keys(result).length === 0)
+			return res.status(404).json({ error: true, errorMessage: 'User not found' });
+
+		const chat = await insertOne('chats', {
+			members: [ObjectId.createFromHexString(userId), result._id],
+			user: true
+		});
+		if (chat.error) return res.status(500).json({ error: true, errorMessage: chat.message });
+
+		return res.status(200).json({
+			error: false,
+			message: 'Chat created successfully',
+			chatId: chat.result.insertedId
+		});
+	} catch (error) {
+		return res.status(500).json({ error: true, errorMessage: error });
+	}
+}
