@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
-import { find, findOne, insertOne, updateOne, deleteOne } from '../utils/dbComponent';
+import {
+	find,
+	findOne,
+	insertOne,
+	updateOne,
+	deleteOne,
+	complexUpdateOne
+} from '../utils/dbComponent';
 import { validateStrings } from '../utils/otherUtils';
+import { ObjectId } from 'mongodb';
 
 export async function createGroup(req: Request, res: Response): Promise<Response> {
 	const userId: string = req.body.user.userId;
@@ -8,23 +16,32 @@ export async function createGroup(req: Request, res: Response): Promise<Response
 	const name: string | undefined = req.body.name;
 	const description: string = req.body.description || '';
 	const memberUsers: string[] = req.body.members || [];
-	const picture: string = req.body.picture || '';
-	if (validateStrings([name, description, picture, ...memberUsers]))
+	const picture: string = req.body.picture || null;
+	if (!validateStrings([name, description, ...memberUsers]))
 		return res.status(400).json({ error: true, message: 'Invalid request' });
 
-	const { error, message, result } = await find('users', { _id: { $in: memberUsers } });
+	let error,
+		message,
+		result = [];
+	if (memberUsers.length > 0) {
+		const userResult = await find('users', { username: { $in: memberUsers } });
+		error = userResult.error;
+		message = userResult.message;
+		result = userResult.result;
+	}
 	if (error) return res.status(500).json({ error: true, message });
 	if (result.length !== memberUsers.length)
 		return res.status(404).json({ error: true, message: 'Users not found' });
 
-	const members = result.map((user: any) => user._id);
+	const members = result.map((user: any) => ObjectId.createFromHexString(user._id));
 
 	const group = await insertOne('chats', {
 		name,
 		description,
-		members: [userId, ...members],
-		admins: [userId],
-		picture: picture || ''
+		members: [ObjectId.createFromHexString(userId), ...members],
+		admins: [ObjectId.createFromHexString(userId)],
+		url: picture,
+		user: false
 	});
 	if (group.error) return res.status(500).json({ error: true, message: group.message });
 	return res.status(200).json({ error: false, group: group.result });
@@ -32,26 +49,15 @@ export async function createGroup(req: Request, res: Response): Promise<Response
 
 export async function updateGroup(req: Request, res: Response): Promise<Response> {
 	const { userId } = req.body.user;
-	const { groupId } = req.body.group;
-
+	const { groupId } = req.body;
 	const name: string | undefined = req.body.name;
 	const description: string | undefined = req.body.description;
-	const members: string[] | undefined = req.body.members;
-	const admins: string[] | undefined = req.body.admins;
 	const picture: string | undefined = req.body.picture;
 
 	if (
-		!(Array.isArray(members) || typeof members === 'undefined') ||
-		!(Array.isArray(admins) || typeof admins === 'undefined') ||
 		!(typeof name === 'string' || typeof name === 'undefined') ||
 		!(typeof description === 'string' || typeof description === 'undefined') ||
-		!(typeof picture === 'string' || typeof picture === 'undefined') ||
-		!(
-			Array.isArray(members) ||
-			typeof name === 'string' ||
-			typeof description === 'string' ||
-			typeof picture === 'string'
-		)
+		!(typeof picture === 'string' || typeof picture === 'undefined')
 	) {
 		return res.status(400).json({ error: true, message: 'Invalid request' });
 	}
@@ -61,15 +67,21 @@ export async function updateGroup(req: Request, res: Response): Promise<Response
 		description?: string;
 		members?: string[];
 		admins?: string[];
-		picture?: string;
+		url?: string;
 	} = {};
 	if (name) update.name = name;
 	if (description) update.description = description;
-	if (members) update.members = members;
-	if (admins) update.admins = admins;
-	if (picture) update.picture = picture;
+	if (picture) update.url = picture;
 
-	const group = await updateOne('chats', { _id: groupId, admins: userId }, update);
+	/* const checkGroup = await findOne('chats', {
+		_id: ObjectId.createFromHexString(groupId),
+		admins: ObjectId.createFromHexString(userId)
+	}); */
+	const group = await updateOne(
+		'chats',
+		{ _id: groupId, admins: ObjectId.createFromHexString(userId) },
+		update
+	);
 	if (group.error) return res.status(500).json({ error: true, message: group.message });
 	return res.status(200).json({ error: false, group: group.result });
 }
@@ -77,7 +89,65 @@ export async function updateGroup(req: Request, res: Response): Promise<Response
 export async function deleteGroup(req: Request, res: Response): Promise<Response> {
 	const { userId } = req.body.user;
 	const { groupId } = req.query;
-	const group = await deleteOne('chats', { _id: groupId, admins: userId });
+	const group = await deleteOne('chats', {
+		_id: groupId,
+		admins: ObjectId.createFromHexString(userId)
+	});
 	if (group.error) return res.status(500).json({ error: true, message: group.message });
 	return res.status(200).json({ error: false, group: group.result });
+}
+
+export async function addMembers(req: Request, res: Response): Promise<Response> {
+	const { userId } = req.body.user;
+	const { groupId } = req.body;
+	const { members } = req.body;
+	if (!Array.isArray(members))
+		return res.status(400).json({ error: true, message: 'Invalid request' });
+
+	const group = await findOne('chats', {
+		_id: groupId,
+		admins: ObjectId.createFromHexString(userId)
+	});
+	if (group.error) return res.status(500).json({ error: true, message: group.message });
+	if (!group.result || Object.keys(group.result).length === 0)
+		return res.status(404).json({ error: true, message: 'Group not found' });
+
+	const userResult = await find('users', { username: { $in: members } });
+	if (userResult.error) return res.status(500).json({ error: true, message: userResult.message });
+
+	console.log(userResult.result);
+	const membersIds = userResult.result.map((user: any) => user._id);
+	const update = await complexUpdateOne(
+		'chats',
+		{ _id: groupId },
+		{ $push: { members: { $each: membersIds } } }
+	);
+	if (update.error) return res.status(500).json({ error: true, message: update.message });
+	return res.status(200).json({ error: false, group: update.result });
+}
+
+export async function removeMember(req: Request, res: Response): Promise<Response> {
+	const { userId } = req.body.user;
+	const { groupId, member } = req.body;
+	const group = await findOne('chats', {
+		_id: groupId,
+		admins: ObjectId.createFromHexString(userId)
+	});
+	if (group.error) return res.status(500).json({ error: true, message: group.message });
+	if (!group.result || Object.keys(group.result).length === 0)
+		return res.status(404).json({ error: true, message: 'Group not found' });
+
+	const user = await findOne('users', { username: member });
+	if (user.error) return res.status(500).json({ error: true, message: user.message });
+	if (!user.result || Object.keys(user.result).length === 0)
+		return res.status(404).json({ error: true, message: 'User not found' });
+	const memberId = user.result._id;
+
+	const update = await complexUpdateOne(
+		'chats',
+		{ _id: groupId },
+		{ $pull: { members: memberId } }
+	);
+	if (update.error) return res.status(500).json({ error: true, message: update.message });
+	return res.status(200).json({ error: false, group: update.result });
 }

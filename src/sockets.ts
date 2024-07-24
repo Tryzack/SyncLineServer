@@ -62,19 +62,21 @@ export async function ioConnection(socket: Socket) {
 
 	socket.on(
 		'chat-message',
-		async (data: { message: string; receiver: string; chat: string | null }) => {
-			let { message, receiver, chat } = data;
+		async (data: { message: string; receiver: string; chat: string | null; type: string }) => {
+			let { message, receiver, chat, type } = data;
 			const timestamp = new Date().toISOString();
 
-			if (!validateStrings([message, receiver, timestamp]))
+			if (!validateStrings([message, receiver, type]))
 				return socket.emit('error', 'Invalid request');
 			message = message.trim();
 			receiver = receiver.trim();
+			type = type.trim();
 
 			const socketReceiver = users.get(receiver);
 			if (socketReceiver)
 				socketReceiver.emit('chat-message', {
 					message,
+					messageType: type,
 					sender: username,
 					timestamp
 				});
@@ -82,7 +84,7 @@ export async function ioConnection(socket: Socket) {
 			const result = await insertChatMessage(
 				{
 					message,
-					messageType: 'text',
+					messageType: type,
 					sender: username,
 					timestamp,
 					receiver: receiver,
@@ -97,16 +99,17 @@ export async function ioConnection(socket: Socket) {
 		}
 	);
 
-	socket.on('group-message', async (data: { message: string; chat: string }) => {
+	socket.on('group-message', async (data: { message: string; chat: string; type: string }) => {
 		// need changes
 		try {
-			let { message, chat } = data;
+			let { message, chat, type } = data;
 			const timestamp = new Date().toISOString();
-			if (!validateStrings([message, chat, timestamp]))
+			if (!validateStrings([message, chat, type]))
 				return socket.emit('error', 'Invalid request');
 
 			message = message.trim();
 			chat = chat.trim();
+			type = type.trim();
 
 			const group = await aggregateFind('groups', [
 				{
@@ -147,6 +150,7 @@ export async function ioConnection(socket: Socket) {
 				if (socketMember)
 					socketMember.emit('group-message', {
 						message,
+						messageType: type,
 						sender: username,
 						timestamp
 					});
@@ -154,7 +158,7 @@ export async function ioConnection(socket: Socket) {
 			const result = await insertChatMessage(
 				{
 					message,
-					messageType: 'text',
+					messageType: type,
 					sender: username,
 					receiver: group.result._id,
 					timestamp,
