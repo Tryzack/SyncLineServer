@@ -22,6 +22,15 @@ export async function editProfile(req: Request, res: Response) {
 		return res.status(404).json({ error: true, message: 'User not found' });
 	}
 
+	const checkUser = await findOne('users', {
+		_id: { $ne: userId },
+		$or: [{ email }, { username }]
+	});
+
+	if (checkUser.result && Object.keys(checkUser.result).length > 0) {
+		return res.status(400).json({ error: true, message: 'Email or username already in use' });
+	}
+
 	const { error: updateError, message: updateMessage } = await updateOne(
 		'users',
 		{ _id: userId },
