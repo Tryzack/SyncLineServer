@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import { findOne, aggregateFind, find, insertOne } from '../utils/dbComponent';
+import { findOne, aggregateFind, find, insertOne, deleteMany } from '../utils/dbComponent';
 import { ObjectId } from 'mongodb';
-import { url } from 'inspector';
 
 export async function getChats(req: Request, res: Response) {
 	const memberId: string = req.body.user.userId;
@@ -210,6 +209,49 @@ export async function createChat(req: Request, res: Response) {
 			message: 'Chat created successfully',
 			chatId: chat.result.insertedId
 		});
+	} catch (error) {
+		return res.status(500).json({ error: true, errorMessage: error });
+	}
+}
+
+export async function deleteChat(req: Request, res: Response) {
+	const userId: string = req.body.user.userId;
+	const chatId: string = req.body.chatId;
+	//find chat, chat-messages where chatId = chatId, and delete messages using the id from chat-messages, then delete chat and chat-messages
+	try {
+		const chat = await findOne('chats', {
+			_id: chatId,
+			members: ObjectId.createFromHexString(userId)
+		});
+		if (chat.error) return res.status(500).json({ error: true, errorMessage: chat.message });
+		if (!chat.result || Object.keys(chat.result).length === 0)
+			return res.status(404).json({ error: true, errorMessage: 'Chat not found' });
+
+		const chatMessages = await find('chat-messages', { chatId: chatId });
+		if (chatMessages.error)
+			return res.status(500).json({ error: true, errorMessage: chatMessages.message });
+
+		const deleteMessages = await deleteMany('messages', {
+			_id: {
+				$in: chatMessages.result.map((message: any) =>
+					ObjectId.createFromHexString(message.messageId)
+				)
+			}
+		});
+		if (deleteMessages.error)
+			return res.status(500).json({ error: true, errorMessage: deleteMessages.message });
+
+		const deleteChatMessages = await deleteMany('chat-messages', {
+			chatId: ObjectId.createFromHexString(chatId)
+		});
+		if (deleteChatMessages.error)
+			return res.status(500).json({ error: true, errorMessage: deleteChatMessages.message });
+
+		const deleteChat = await deleteMany('chats', { _id: chatId });
+		if (deleteChat.error)
+			return res.status(500).json({ error: true, errorMessage: deleteChat.message });
+
+		return res.status(200).json({ error: false, message: 'Chat deleted successfully' });
 	} catch (error) {
 		return res.status(500).json({ error: true, errorMessage: error });
 	}

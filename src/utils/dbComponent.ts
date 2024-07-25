@@ -218,6 +218,37 @@ export async function deleteOne(
 }
 
 /**
+ * Function to delete many documents in a collection
+ * @param collection - The collection to delete in
+ * @param filter - The filter to apply to the documents to delete, _id should be a string
+ * @returns { error: boolean, message: string, result: any | null }
+ */
+export async function deleteMany(
+	collection: string,
+	filter: Record<string, any>
+): Promise<responseInterface> {
+	try {
+		const client = await getClient();
+		if (!client) {
+			return {
+				error: true,
+				message: 'Error connecting to the database',
+				result: null
+			};
+		}
+		if (filter._id && typeof filter._id === 'string') {
+			filter._id = ObjectId.createFromHexString(filter._id);
+		}
+		const db = client.db(dbName);
+		const result = await db.collection(collection).deleteMany(filter);
+		return { error: false, message: 'Success', result };
+	} catch (error) {
+		console.error('Error deleting documents', error);
+		return { error: true, message: 'Error deleting documents', result: null };
+	}
+}
+
+/**
  * Function to update one document in a collection
  * @param collection - The collection to update in
  * @param filter - The filter to apply to the document to update, _id should be a string

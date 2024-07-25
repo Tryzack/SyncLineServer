@@ -209,10 +209,10 @@ export async function ioConnection(socket: Socket) {
 
 		if (user) {
 			// need changes
+			return;
 			const usersResponse = await aggregateFind('chats', []);
 			if (usersResponse.error) return socket.emit('error', usersResponse.message);
 			if (usersResponse.result.length === 0) return socket.emit('error', 'User not found');
-			return;
 			const members: Array<{ username: string }> = usersResponse.result.membersInfo;
 			members.forEach((member) => {
 				const socketMember = users.get(member.username);
