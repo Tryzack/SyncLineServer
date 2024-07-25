@@ -47,3 +47,19 @@ export async function editProfile(req: Request, res: Response) {
 	}
 	return res.status(200).json({ error: false, message: 'Profile updated successfully' });
 }
+
+export async function checkEmail(req: Request, res: Response) {
+	const email = req.body.email;
+
+	const emailResult = await findOne('users', {
+		email: email,
+		disabled: { isDisabled: false, timestamp: null }
+	});
+	if (emailResult.error)
+		return res.status(500).json({ error: true, message: emailResult.message });
+
+	if (emailResult.result && Object.keys(emailResult.result).length > 0)
+		return res.status(409).json({ error: true, message: 'user with email already exists' });
+
+	return res.status(200).json({ error: false, message: 'email available' });
+}

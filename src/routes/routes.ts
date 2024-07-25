@@ -17,7 +17,7 @@ import { uploadFile } from '../controllers/uploadFile';
 import { getFriends, addFriend, deleteFriend } from '../controllers/friends';
 import { getChats, getChatMessages } from '../controllers/chats';
 import { getStatus, createStatus } from '../controllers/status';
-import { editProfile } from '../controllers/auth/profile';
+import { editProfile, checkEmail } from '../controllers/auth/profile';
 
 const router: Router = Router();
 
@@ -28,6 +28,7 @@ router.delete('/auth/unregister', verifyToken, unregister);
 router.get('/auth/logout', logout);
 
 router.put('/profile/edit', verifyToken, editProfile);
+router.post('/profile/checkEmail', checkEmail);
 
 router.post('/recovery/sendCode', sendRecoveryCode);
 router.post('/recovery/verifyCode', recoveryCode);

@@ -2,8 +2,9 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { secretKey, expiresIn } from '../../../index';
 import bcrypt from 'bcrypt';
-import { findOne, insertOne, deleteOne, updateOne } from '../../utils/dbComponent';
+import { findOne, insertOne, updateOne, complexUpdateOne } from '../../utils/dbComponent';
 import { validateStrings } from '../../utils/otherUtils';
+import { ObjectId } from 'mongodb';
 
 export async function login(req: Request, res: Response): Promise<Response> {
 	let { email, password } = req.body;
@@ -44,7 +45,14 @@ export async function login(req: Request, res: Response): Promise<Response> {
 		expiresIn: expiresIn
 	});
 	res.cookie('token', token, { httpOnly: true });
-	return res.status(200).json({ message: 'Logged in successfully', token });
+	return res.status(200).json({
+		message: 'Logged in successfully',
+		token,
+		userData: {
+			username: result.username,
+			url: result.url
+		}
+	});
 }
 
 export async function register(req: Request, res: Response): Promise<Response> {
@@ -158,13 +166,6 @@ export async function unregister(req: Request, res: Response): Promise<Response>
 	if (!userId) {
 		return res.status(401).json({ error: true, message: 'I have no idea how you got here' });
 	}
-	let { password } = req.body;
-
-	if (!validateStrings([password])) {
-		return res.status(400).json({ error: true, message: 'Invalid password type' });
-	}
-
-	password = password.trim();
 
 	const { error, message, result } = await findOne('users', { _id: userId });
 
@@ -176,13 +177,15 @@ export async function unregister(req: Request, res: Response): Promise<Response>
 		return res.status(404).json({ error: true, message: 'User not found' });
 	}
 
-	if (!(await bcrypt.compare(password, result.password))) {
-		return res.status(401).json({ error: true, message: 'Invalid password' });
-	}
-
-	const { error: deleteError, message: deleteMessage } = await updateOne(
+	const { error: deleteError, message: deleteMessage } = await complexUpdateOne(
 		'users',
-		{ _id: userId },
+		{
+			_id: userId,
+			disabled: {
+				isDisabled: false,
+				timestamp: null
+			}
+		},
 		{ $set: { disabled: { isDisabled: true, timestamp: new Date() } } }
 	);
 	if (deleteError) {
