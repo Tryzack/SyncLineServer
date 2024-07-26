@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { aggregateFind, findOne, complexUpdateOne } from '../utils/dbComponent';
 import { validateStrings } from '../utils/otherUtils';
 import { v4 } from 'uuid';
-import path from 'path';
 
 export async function createStatus(req: Request, res: Response) {
 	const { userId } = req.body.user;
@@ -18,7 +17,8 @@ export async function createStatus(req: Request, res: Response) {
 	const status = {
 		id: v4(),
 		content,
-		description
+		description,
+		timestamp: new Date().toISOString()
 	};
 
 	const result = await complexUpdateOne(
@@ -93,7 +93,7 @@ export async function getStatus(req: Request, res: Response) {
 	const statuses = await aggregateFind('users', [
 		{
 			$match: {
-				username: { $in: friends } // Assuming 'friends' contains the user IDs of friends
+				username: { $in: [result.result.username, ...friends] } // In case of the user and their friends
 			}
 		},
 		{
