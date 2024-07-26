@@ -10,7 +10,7 @@ export async function editProfile(req: Request, res: Response) {
 	}
 	let { username, email, url } = req.body;
 
-	if (!validateStrings([email, url, username])) {
+	if (!validateStrings([email, username])) {
 		return res.status(400).json({ error: true, message: 'Invalid input type' });
 	}
 
@@ -36,7 +36,7 @@ export async function editProfile(req: Request, res: Response) {
 		'users',
 		{ _id: userId },
 
-		{ username, email, url }
+		{ username, email, url: url || null }
 	);
 	if (updateError) {
 		return res.status(500).json({ error: true, message: updateMessage });
