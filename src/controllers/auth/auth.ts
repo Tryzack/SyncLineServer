@@ -105,7 +105,7 @@ export async function register(req: Request, res: Response): Promise<Response> {
 		email,
 		username,
 		password: hashedPassword,
-		url: [typeof url === 'string' ? url : null],
+		url: typeof url === 'string' ? url : null,
 		friends: [],
 		disabled: { isDisabled: false, timestamp: null },
 		status: []

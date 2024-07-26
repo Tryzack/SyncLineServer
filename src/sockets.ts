@@ -106,6 +106,7 @@ export async function ioConnection(socket: Socket) {
 		const socketReceiver = users.get(receiver);
 		if (socketReceiver)
 			socketReceiver.emit('chat-message', {
+				chat: chat,
 				message,
 				messageType: type,
 				sender: username,
@@ -129,79 +130,72 @@ export async function ioConnection(socket: Socket) {
 	});
 
 	socket.on('group-message', async (data: { message: string; chat: string; type: string }) => {
-		// need changes
-		try {
-			let { message, chat, type } = data;
-			const timestamp = new Date().toISOString();
-			if (!validateStrings([message, chat, type]))
-				return socket.emit('error', 'Invalid request');
+		let { message, chat, type } = data;
+		const timestamp = new Date().toISOString();
 
-			message = message.trim();
-			chat = chat.trim();
-			type = type.trim();
+		if (!validateStrings([message, chat, type])) return socket.emit('error', 'Invalid request');
+		message = message.trim();
+		type = type.trim();
 
-			const group = await aggregateFind('groups', [
-				{
-					$match: {
-						_id: ObjectId.createFromHexString(chat),
-						user: false
-					}
-				},
-				{
-					$lookup: {
-						from: 'users',
-						localField: 'members',
-						foreignField: '_id',
-						as: 'membersInfo'
-					}
-				},
-				{
-					$project: {
-						membersInfo: {
-							$map: {
-								input: '$membersInfo',
-								as: 'member',
-								in: {
-									username: '$$member.username'
-								}
+		const groupResult = await aggregateFind('chats', [
+			{
+				$match: {
+					_id: ObjectId.createFromHexString(chat),
+					user: false
+				}
+			},
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'members',
+					foreignField: '_id',
+					as: 'membersInfo'
+				}
+			},
+			{
+				$project: {
+					membersInfo: {
+						$map: {
+							input: '$membersInfo',
+							as: 'member',
+							in: {
+								username: '$$member.username'
 							}
 						}
 					}
 				}
-			]);
-			if (group.error) return socket.emit('error', group.message);
-
-			if (group.result.length === 0) return socket.emit('error', 'Group not found');
-
-			const members: Array<{ username: string }> = group.result.membersInfo;
-			for (const member of members) {
-				const socketMember = users.get(member.username);
-				if (socketMember)
-					socketMember.emit('group-message', {
-						message,
-						messageType: type,
-						sender: username,
-						timestamp
-					});
 			}
-			const result = await insertChatMessage(
-				{
+		]);
+		if (groupResult.error) return socket.emit('error', groupResult.message);
+		if (groupResult.result.length === 0) return socket.emit('error', 'Group not found');
+		const members: Array<{ username: string }> = groupResult.result.membersInfo;
+		members.forEach((member) => {
+			const socketMember = users.get(member.username);
+			if (socketMember)
+				socketMember.emit('group-message', {
+					chat: chat,
 					message,
-					type: type,
+					messageType: type,
 					sender: username,
 					timestamp
-				},
-				chat
-			);
-			if (result.error) {
-				socket.emit('error', result.errorMessage);
-			}
+				});
+		});
+		console.log(members);
+		console.log('Message sent');
 
-			socket.emit('message-sent', { chat, message, timestamp });
-		} catch (error) {
-			console.error('Error sending group message', error);
-			socket.emit('error', 'Error sending group message');
+		const result = await insertChatMessage(
+			{
+				message,
+				type: type,
+				sender: username,
+				timestamp
+			},
+			chat
+		);
+		if (result.error) {
+			socket.emit('error', result.errorMessage);
 		}
+		socket.emit('message-sent', { message, timestamp });
 	});
 
 	socket.on('update', async (data: { chat: string; user: boolean }) => {

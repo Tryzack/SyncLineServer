@@ -19,17 +19,7 @@ export async function getChats(req: Request, res: Response) {
 				}
 			},
 			{
-				$project: {
-					members: 1,
-					user: 1,
-					name: 1,
-					description: 1,
-					url: 1,
-					message: { $slice: ['$message', 1] } // Limit to the first 1 messages
-				}
-			},
-			{
-				$unwind: { path: '$messages', preserveNullAndEmptyArrays: true }
+				$unwind: { path: '$message', preserveNullAndEmptyArrays: true }
 			},
 			{
 				$lookup: {
@@ -38,6 +28,33 @@ export async function getChats(req: Request, res: Response) {
 					foreignField: '_id',
 					as: 'message.messageContent'
 				}
+			},
+			{
+				$sort: { 'message.messageContent.timestamp': -1 } // Sort messages by timestamp in descending order
+			},
+			{
+				$group: {
+					_id: '$_id',
+					members: { $first: '$members' },
+					user: { $first: '$user' },
+					name: { $first: '$name' },
+					description: { $first: '$description' },
+					url: { $first: '$url' },
+					message: { $push: '$message' }
+				}
+			},
+			{
+				$project: {
+					members: 1,
+					user: 1,
+					name: 1,
+					description: 1,
+					url: 1,
+					message: { $slice: ['$message', 1] } // Limit to the first 1 message
+				}
+			},
+			{
+				$unwind: { path: '$message', preserveNullAndEmptyArrays: true }
 			},
 			{
 				$lookup: {
@@ -72,8 +89,18 @@ export async function getChats(req: Request, res: Response) {
 			return res.status(500).json({ error: true, errorMessage: chats.message });
 		}
 
+		//sort chats by last message timestamp
+		chats.result.sort((a: any, b: any) => {
+			const messageA = a.message.messageContent[0];
+			const messageB = b.message.messageContent[0];
+			if (messageA && messageB) {
+				return messageB.timestamp - messageA.timestamp;
+			}
+		});
+
 		return res.status(200).json(chats);
 	} catch (error) {
+		console.error(error);
 		return res.status(500).json({ error: true, errorMessage: error });
 	}
 }
