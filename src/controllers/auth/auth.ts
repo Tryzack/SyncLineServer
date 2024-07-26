@@ -123,10 +123,10 @@ export async function register(req: Request, res: Response): Promise<Response> {
 }
 
 export async function updateUser(req: Request, res: Response): Promise<Response> {
-	let { email, password, username, url } = req.body;
+	let { email, username, url } = req.body;
 	const userId = req.body.user.userId;
 
-	if (!validateStrings([email, password, username])) {
+	if (!validateStrings([email, username])) {
 		return res.status(400).json({ error: true, message: 'Invalid request types' });
 	}
 
@@ -149,6 +149,50 @@ export async function updateUser(req: Request, res: Response): Promise<Response>
 	}
 
 	return res.status(200).json({ error: false, message: 'User updated successfully' });
+}
+
+export async function changePassword(req: Request, res: Response): Promise<Response> {
+	let { oldPassword, newPassword } = req.body;
+	const userId = req.body.user.userId;
+
+	if (!validateStrings([oldPassword, newPassword])) {
+		return res.status(400).json({ error: true, message: 'Invalid request types' });
+	}
+
+	oldPassword = oldPassword.trim();
+	newPassword = newPassword.trim();
+
+	if (newPassword.length < 8) {
+		return res.status(400).json({
+			error: true,
+			message: 'Password must be at least 8 characters long'
+		});
+	}
+
+	const { error, message, result } = await findOne('users', { _id: userId });
+	if (error) {
+		return res.status(500).json({ error: true, message });
+	}
+
+	if (!result || Object.keys(result).length === 0) {
+		return res.status(404).json({ error: true, message: 'User not found' });
+	}
+
+	if (!(await bcrypt.compare(oldPassword, result.password))) {
+		return res.status(401).json({ error: true, message: 'Invalid old password' });
+	}
+
+	const hashedPassword = await bcrypt.hash(newPassword, 10);
+	const { error: updateError, message: updateMessage } = await updateOne(
+		'users',
+		{ _id: userId },
+		{ $set: { password: hashedPassword } }
+	);
+	if (updateError) {
+		return res.status(500).json({ error: true, message: updateMessage });
+	}
+
+	return res.status(200).json({ error: false, message: 'Password changed successfully' });
 }
 
 export function checkSession(req: Request, res: Response): Response {

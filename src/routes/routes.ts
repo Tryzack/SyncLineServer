@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { login, register, checkSession, unregister, logout } from '../controllers/auth/auth';
+import {
+	login,
+	register,
+	checkSession,
+	unregister,
+	logout,
+	changePassword
+} from '../controllers/auth/auth';
 import {
 	recoveryCode,
 	recoveryPassword,
@@ -27,6 +34,7 @@ router.post('/auth/login', login);
 router.post('/auth/register', register);
 router.delete('/auth/unregister', verifyToken, unregister);
 router.get('/auth/logout', logout);
+router.put('/auth/changePassword', verifyToken, changePassword);
 
 router.put('/profile/edit', verifyToken, editProfile);
 router.post('/profile/checkEmail', checkEmail);
