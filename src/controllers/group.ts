@@ -114,7 +114,6 @@ export async function addMembers(req: Request, res: Response): Promise<Response>
 	if (group.error) return res.status(500).json({ error: true, message: group.message });
 	if (!group.result || Object.keys(group.result).length === 0)
 		return res.status(404).json({ error: true, message: 'Group not found' });
-
 	const ObjectIdsFromMebers = members.map((member: string) =>
 		ObjectId.createFromHexString(member)
 	);
