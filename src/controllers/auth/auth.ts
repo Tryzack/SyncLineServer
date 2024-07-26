@@ -139,11 +139,7 @@ export async function updateUser(req: Request, res: Response): Promise<Response>
 		return res.status(400).json({ error: true, message: 'Invalid email' });
 	}
 
-	const { error, message } = await updateOne(
-		'users',
-		{ _id: userId },
-		{ $set: { email, username, url } }
-	);
+	const { error, message } = await updateOne('users', { _id: userId }, { email, username, url });
 	if (error) {
 		return res.status(500).json({ error: true, message });
 	}
@@ -175,6 +171,7 @@ export async function changePassword(req: Request, res: Response): Promise<Respo
 	}
 
 	if (!result || Object.keys(result).length === 0) {
+		console.log(result);
 		return res.status(404).json({ error: true, message: 'User not found' });
 	}
 
@@ -183,9 +180,11 @@ export async function changePassword(req: Request, res: Response): Promise<Respo
 	}
 
 	const hashedPassword = await bcrypt.hash(newPassword, 10);
-	const { error: updateError, message: updateMessage } = await updateOne(
+	const { error: updateError, message: updateMessage } = await complexUpdateOne(
 		'users',
-		{ _id: userId },
+		{
+			_id: userId
+		},
 		{ $set: { password: hashedPassword } }
 	);
 	if (updateError) {
