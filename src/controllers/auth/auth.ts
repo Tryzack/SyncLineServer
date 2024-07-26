@@ -138,7 +138,7 @@ export async function updateUser(req: Request, res: Response): Promise<Response>
 	if (!emailRegex.test(email)) {
 		return res.status(400).json({ error: true, message: 'Invalid email' });
 	}
-
+	console.log(userId);
 	const { error, message } = await updateOne('users', { _id: userId }, { email, username, url });
 	if (error) {
 		return res.status(500).json({ error: true, message });

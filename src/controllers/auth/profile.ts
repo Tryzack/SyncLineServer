@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { validateStrings } from '../../utils/otherUtils';
 import { findOne, updateOne } from '../../utils/dbComponent';
+import { ObjectId } from 'mongodb';
 
 export async function editProfile(req: Request, res: Response) {
 	const userId = req.body.user.userId;
@@ -23,7 +24,7 @@ export async function editProfile(req: Request, res: Response) {
 	}
 
 	const checkUser = await findOne('users', {
-		_id: { $ne: userId },
+		_id: { $ne: ObjectId.createFromHexString(userId) },
 		$or: [{ email }, { username }]
 	});
 
@@ -34,13 +35,8 @@ export async function editProfile(req: Request, res: Response) {
 	const { error: updateError, message: updateMessage } = await updateOne(
 		'users',
 		{ _id: userId },
-		{
-			$set: {
-				username,
-				email,
-				url
-			}
-		}
+
+		{ username, email, url }
 	);
 	if (updateError) {
 		return res.status(500).json({ error: true, message: updateMessage });

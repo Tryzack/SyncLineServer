@@ -44,7 +44,7 @@ export async function findOne(
 				result: null
 			};
 		}
-		if (filter._id) {
+		if (filter._id && typeof filter._id === 'string') {
 			filter._id = ObjectId.createFromHexString(filter._id);
 		}
 		const db = client.db(dbName);
