@@ -208,7 +208,8 @@ export async function getChatMessages(req: Request, res: Response) {
 							input: '$membersInfo',
 							as: 'member',
 							in: {
-								username: '$$member.username'
+								username: '$$member.username',
+								url: '$$member.url'
 							}
 						}
 					},
