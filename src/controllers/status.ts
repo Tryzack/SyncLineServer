@@ -59,7 +59,7 @@ export async function createStatus(req: Request, res: Response) {
 		if (deleteResult.error) {
 			console.error(deleteResult.message);
 		}
-	}, devTimer);
+	}, timer);
 
 	return res.status(200).json({
 		error: false,
