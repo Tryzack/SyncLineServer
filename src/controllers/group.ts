@@ -35,7 +35,8 @@ export async function createGroup(req: Request, res: Response): Promise<Response
 	if (result.length !== memberUsers.length)
 		return res.status(404).json({ error: true, message: 'Users not found' });
 
-	const members = result.map((user: any) => ObjectId.createFromHexString(user._id));
+	console.log(result);
+	const members = result.map((user: any) => user._id);
 
 	const group = await insertOne('chats', {
 		name,
