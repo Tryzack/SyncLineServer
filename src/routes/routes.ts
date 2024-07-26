@@ -10,12 +10,13 @@ import {
 	deleteGroup,
 	updateGroup,
 	addMembers,
-	removeMember
+	removeMember,
+	getGroups
 } from '../controllers/group';
 import verifyToken from '../controllers/auth/verifyToken';
 import { uploadFile } from '../controllers/uploadFile';
 import { getFriends, addFriend, deleteFriend } from '../controllers/friends';
-import { getChats, getChatMessages } from '../controllers/chats';
+import { getChats, getChatMessages, getChatWithUser } from '../controllers/chats';
 import { getStatus, createStatus } from '../controllers/status';
 import { editProfile, checkEmail } from '../controllers/auth/profile';
 
@@ -39,6 +40,7 @@ router.delete('/group/delete/', verifyToken, deleteGroup);
 router.put('/group/update/', verifyToken, updateGroup);
 router.post('/group/addMembers', verifyToken, addMembers);
 router.delete('/group/removeMember', verifyToken, removeMember);
+router.get('/groups', verifyToken, getGroups);
 
 router.post('/upload', verifyToken, uploadFile);
 
@@ -48,6 +50,7 @@ router.delete('/friends/delete', verifyToken, deleteFriend);
 
 router.get('/chats', verifyToken, getChats);
 router.get('/chats/messages', verifyToken, getChatMessages);
+router.get('/chats/user', verifyToken, getChatWithUser);
 
 router.get('/status', verifyToken, getStatus);
 router.post('/status', verifyToken, createStatus);

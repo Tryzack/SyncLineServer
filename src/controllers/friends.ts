@@ -1,18 +1,38 @@
 import { Request, Response } from 'express';
-import { findOne, complexUpdateOne } from '../utils/dbComponent';
+import { findOne, complexUpdateOne, aggregateFind } from '../utils/dbComponent';
 import { validateStrings } from '../utils/otherUtils';
+import { ObjectId } from 'mongodb';
 
 export async function getFriends(req: Request, res: Response): Promise<Response> {
-	const result = await findOne('users', {
-		_id: req.body.user.userId
-	});
+	const result = await aggregateFind('users', [
+		{
+			$match: {
+				_id: ObjectId.createFromHexString(req.body.user.userId)
+			}
+		},
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'friends',
+				foreignField: 'username',
+				as: 'friends'
+			}
+		},
+		{
+			$project: {
+				_id: 0,
+				friends: 1
+			}
+		}
+	]);
 	if (result.error) {
 		return res.status(500).json({
 			error: true,
 			message: result.message
 		});
 	}
-	if (!result.result || Object.keys(result.result).length === 0) {
+	console.log(result);
+	if (!result.result || result.result.lenght === 0) {
 		return res.status(404).json({
 			error: true,
 			message: 'User not found'
@@ -20,7 +40,7 @@ export async function getFriends(req: Request, res: Response): Promise<Response>
 	}
 	return res.status(200).json({
 		error: false,
-		friends: result.result.friends
+		friends: result.result[0].friends
 	});
 }
 
@@ -120,6 +140,16 @@ export async function deleteFriend(req: Request, res: Response): Promise<Respons
 		});
 	}
 
+	const resultFriend = await findOne('users', {
+		_id: friend
+	});
+	if (resultFriend.error) {
+		return res.status(500).json({
+			error: true,
+			message: resultFriend.message
+		});
+	}
+
 	await complexUpdateOne(
 		'users',
 		{
@@ -127,7 +157,7 @@ export async function deleteFriend(req: Request, res: Response): Promise<Respons
 		},
 		{
 			$pull: {
-				friends: friend
+				friends: resultFriend.result.username
 			}
 		}
 	);

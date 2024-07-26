@@ -89,12 +89,20 @@ export async function getChats(req: Request, res: Response) {
 			return res.status(500).json({ error: true, errorMessage: chats.message });
 		}
 
-		//sort chats by last message timestamp
 		chats.result.sort((a: any, b: any) => {
-			const messageA = a.message.messageContent[0];
-			const messageB = b.message.messageContent[0];
-			if (messageA && messageB) {
-				return messageB.timestamp - messageA.timestamp;
+			const messageA = a.message?.messageContent?.[0];
+			const messageB = b.message?.messageContent?.[0];
+
+			if (messageA?.timestamp && messageB?.timestamp) {
+				return (
+					new Date(messageB.timestamp).getTime() - new Date(messageA.timestamp).getTime()
+				);
+			} else if (messageA?.timestamp) {
+				return -1; // Place chats with a recent message above chats without a recent message
+			} else if (messageB?.timestamp) {
+				return 1; // Place chats without a recent message below chats with a recent message
+			} else {
+				return 0; // If neither chat has a recent message, maintain their current order
 			}
 		});
 
@@ -103,6 +111,36 @@ export async function getChats(req: Request, res: Response) {
 		console.error(error);
 		return res.status(500).json({ error: true, errorMessage: error });
 	}
+}
+
+export async function getChatWithUser(req: Request, res: Response) {
+	const userId: string = req.body.user.userId;
+	const member: string = req.query.member as string;
+
+	const result = await findOne('chats', {
+		members: {
+			$all: [ObjectId.createFromHexString(userId), ObjectId.createFromHexString(member)]
+		},
+		user: true
+	});
+	if (result.error) {
+		return res.status(500).json({ error: true, errorMessage: result.message });
+	}
+	if (!result.result || Object.keys(result.result).length === 0) {
+		// Create a new chat if one does not exist
+		const chat = await insertOne('chats', {
+			members: [ObjectId.createFromHexString(userId), ObjectId.createFromHexString(member)],
+			user: true
+		});
+
+		if (chat.error) {
+			return res.status(500).json({ error: true, errorMessage: chat.message });
+		}
+
+		return res.status(200).json({ error: false, chatId: chat.result.insertedId });
+	}
+
+	return res.status(200).json({ error: false, chatId: result.result._id });
 }
 
 export async function getChatMessages(req: Request, res: Response) {

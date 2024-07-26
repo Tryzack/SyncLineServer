@@ -5,10 +5,12 @@ import {
 	insertOne,
 	updateOne,
 	deleteOne,
-	complexUpdateOne
+	complexUpdateOne,
+	aggregateFind
 } from '../utils/dbComponent';
 import { validateStrings } from '../utils/otherUtils';
 import { ObjectId } from 'mongodb';
+import { lookup } from 'dns';
 
 export async function createGroup(req: Request, res: Response): Promise<Response> {
 	const userId: string = req.body.user.userId;
@@ -100,7 +102,7 @@ export async function deleteGroup(req: Request, res: Response): Promise<Response
 export async function addMembers(req: Request, res: Response): Promise<Response> {
 	const { userId } = req.body.user;
 	const { groupId } = req.body;
-	const { members } = req.body;
+	const { members } = req.body; // array of ids
 	if (!Array.isArray(members))
 		return res.status(400).json({ error: true, message: 'Invalid request' });
 
@@ -112,15 +114,22 @@ export async function addMembers(req: Request, res: Response): Promise<Response>
 	if (!group.result || Object.keys(group.result).length === 0)
 		return res.status(404).json({ error: true, message: 'Group not found' });
 
-	const userResult = await find('users', { username: { $in: members } });
-	if (userResult.error) return res.status(500).json({ error: true, message: userResult.message });
+	const ObjectIdsFromMebers = members.map((member: string) =>
+		ObjectId.createFromHexString(member)
+	);
+	// check if member is already in group
+	const membersInGroup = group.result.members.map((member: any) => member.toString());
+	const membersToAdd = ObjectIdsFromMebers.filter(
+		(member) => !membersInGroup.includes(member.toString())
+	);
 
-	console.log(userResult.result);
-	const membersIds = userResult.result.map((user: any) => user._id);
+	if (membersToAdd.length === 0)
+		return res.status(400).json({ error: true, message: 'Members already in group' });
+
 	const update = await complexUpdateOne(
 		'chats',
 		{ _id: groupId },
-		{ $push: { members: { $each: membersIds } } }
+		{ $push: { members: { $each: membersToAdd } } }
 	);
 	if (update.error) return res.status(500).json({ error: true, message: update.message });
 	return res.status(200).json({ error: false, group: update.result });
@@ -150,4 +159,33 @@ export async function removeMember(req: Request, res: Response): Promise<Respons
 	);
 	if (update.error) return res.status(500).json({ error: true, message: update.message });
 	return res.status(200).json({ error: false, group: update.result });
+}
+
+export async function getGroups(req: Request, res: Response): Promise<Response> {
+	const { userId } = req.body.user;
+	const groups = await aggregateFind('chats', [
+		{
+			$match: {
+				admins: ObjectId.createFromHexString(userId),
+				user: false
+			}
+		},
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'members',
+				foreignField: '_id',
+				as: 'membersInfo'
+			}
+		},
+		{
+			$project: {
+				_id: 1,
+				name: 1,
+				membersInfo: 1
+			}
+		}
+	]);
+	if (groups.error) return res.status(500).json({ error: true, message: groups.message });
+	return res.status(200).json({ error: false, groups: groups.result });
 }
